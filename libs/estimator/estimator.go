@@ -1,6 +1,7 @@
 package estimator
 
 import (
+	"fmt"
 	"serialization_estimator/libs/support"
 	"time"
 )
@@ -28,7 +29,7 @@ func New(method string) Estimator {
     case "avro": return newAvrobufEstimator()
 
     default: {
-        panic("Invalid serialization method")
+        panic(fmt.Errorf("invalid serialization method: %s", method))
     }
     }
 }

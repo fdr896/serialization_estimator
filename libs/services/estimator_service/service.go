@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 	"syscall"
+	"time"
 
 	"serialization_estimator/libs/estimator"
 	"serialization_estimator/libs/services/protocol"
@@ -32,7 +33,7 @@ func New(port, method string) *Service {
 func (s *Service) Start() error {
     var wg sync.WaitGroup
 
-    unicastAddr, err := net.ResolveUDPAddr("udp", ":" + s.port)
+    unicastAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(s.estimator.Method(), s.port))
     if err != nil {
         return err
     }
@@ -43,6 +44,8 @@ func (s *Service) Start() error {
     if err != nil {
         return err
     }
+    file, _:= unicastConn.File()
+    syscall.SetsockoptInt(int(file.Fd()), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
     if s.multicastAddr != nil {
         multicastConn, err = net.ListenMulticastUDP("udp", nil, s.multicastAddr)
         if err != nil {
@@ -56,7 +59,7 @@ func (s *Service) Start() error {
     wg.Add(1)
     go func() {
         zlog.Info().
-            Str("port", s.port).
+            Str("addr", unicastAddr.String()).
             Str("method", s.estimator.Method()).
             Msg("Estimator service serves unicast")
 
@@ -120,14 +123,17 @@ func (s *Service) serve(conn *net.UDPConn) {
         }
 
         if req.RespPort != nil {
-            zlog.Debug().Str("Port", req.RespPort.Port).Msg("Responding to")
-            sender, err = net.ResolveUDPAddr("udp", ":" + req.RespPort.Port)
+            respAddr := net.JoinHostPort(req.RespPort.IP, req.RespPort.Port)
+            zlog.Debug().Str("addr", respAddr).Msg("Responding to")
+
+            sender, err = net.ResolveUDPAddr("udp", respAddr)
             if err != nil {
                 zlog.Error().Err(err).Msg("Incorrect multicast addr")
                 continue
             }
         }
 
+        conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
         _, err = conn.WriteToUDP(respBytes, sender)
         if err != nil {
             zlog.Error().Err(err).Msg("Failed to response")

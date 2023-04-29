@@ -1,0 +1,31 @@
+FROM golang:1.19
+
+WORKDIR /usr/local/go/src/serialization_estimator
+
+COPY go.mod go.sum ./
+RUN go mod download
+RUN go install github.com/spf13/cobra-cli@latest
+
+COPY . .
+
+RUN cd bin/proxy && go install
+
+ARG PORT
+ARG JSON_PORT
+ARG XML_PORT
+ARG NATIVE_PORT
+ARG PROTOBUF_PORT
+ARG YAML_PORT
+ARG MSGPACK_PORT
+ARG AVRO_PORT
+
+ENV PORT ${PORT}
+ENV JSON_PORT ${JSON_PORT}
+ENV XML_PORT ${XML_PORT}
+ENV NATIVE_PORT ${NATIVE_PORT}
+ENV PROTOBUF_PORT ${PROTOBUF_PORT}
+ENV YAML_PORT ${YAML_PORT}
+ENV MSGPACK_PORT ${MSGPACK_PORT}
+ENV AVRO_PORT ${AVRO_PORT}
+
+CMD proxy

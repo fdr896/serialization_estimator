@@ -1,0 +1,42 @@
+version: '1.0'
+
+x-multicast-addr: &multicast-addr
+  MULTICAST_ADDR: 224.0.0.7 
+  MULTICAST_PORT: 2010
+
+services:
+  native:
+    image: fdr400/serialization_estimator:native
+    environment: *multicast-addr
+  json:
+    image: fdr400/serialization_estimator:json
+    environment: *multicast-addr
+  xml:
+    image: fdr400/serialization_estimator:xml
+    environment: *multicast-addr
+  yaml:
+    image: fdr400/serialization_estimator:yaml
+    environment: *multicast-addr
+  msgpack:
+    image: fdr400/serialization_estimator:msgpack
+    environment: *multicast-addr
+  protobuf:
+    image: fdr400/serialization_estimator:protobuf
+    environment: *multicast-addr
+  avro:
+    image: fdr400/serialization_estimator:avro
+    environment: *multicast-addr
+
+  proxy:
+    image: fdr400/serialization_estimator_proxy:latest
+    ports:
+      - "2000:2000/udp"
+    environment: *multicast-addr
+    depends_on:
+      - native
+      - json
+      - xml
+      - yaml
+      - msgpack
+      - protobuf
+      - avro

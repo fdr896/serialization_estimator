@@ -10,6 +10,7 @@ import (
 // REQUEST
 
 type MulticastRespPort struct {
+	IP   string `json:"ip"`
 	Port string `json:"port"`
 }
 
@@ -24,6 +25,7 @@ func NewEstimatorGetResultRequest(addr *net.UDPAddr) *EstimatorRequest {
 	}
 	if addr != nil {
 		er.RespPort = &MulticastRespPort{
+			IP: addr.IP.String(),
 			Port: strconv.Itoa(addr.Port),
 		}
 	}

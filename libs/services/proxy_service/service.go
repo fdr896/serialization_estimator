@@ -10,6 +10,7 @@ import (
 	"serialization_estimator/libs/support"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	zlog "github.com/rs/zerolog/log"
@@ -44,13 +45,21 @@ func (s *Service) Start() error {
 		Interface("available methods", s.connByMethod).
         Msg("Running proxy service")
 
-    addr, err := net.ResolveUDPAddr("udp", ":" + s.port)
+    addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("proxy", s.port))
     if err != nil {
         return err
     }
 
     multicastAddr := support.GetMulticastGroupAddrFromEnv()
     if multicastAddr != nil {
+        {
+            addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("proxy", "2030"))
+            if (err != nil) {
+                return err
+            }
+            go s.serveMulticastResponses(addr)
+        }
+
         conn, err := net.DialUDP("udp", nil, multicastAddr)
         if err != nil {
             return err
@@ -63,14 +72,15 @@ func (s *Service) Start() error {
 
         s.multicastRespChan = make(chan string)
         s.multicastErrChain = make(chan error)
-
-        go s.serveMulticastResponses()
     }
 
     conn, err := net.ListenUDP("udp", addr)
     if err != nil {
         return err
     }
+    zlog.Info().
+        Str("addr", addr.String()).
+        Msg("Proxy service listens")
 
     for {
         buf := make([]byte, protocol.MAX_DATAGRAM_SIZE)
@@ -152,6 +162,7 @@ func (s *Service) handleGetResult(req *protocol.ProxyRequest) (*protocol.ProxyRe
 
     // receive estimator's response
     respBuf := make([]byte, protocol.MAX_DATAGRAM_SIZE)
+    conn.SetReadDeadline(time.Now().Add(3 * time.Second))
     n, _, err := conn.ReadFromUDP(respBuf)
     if err != nil {
         return nil, err
@@ -183,19 +194,15 @@ func (s *Service) handleGetResultAll() error {
     return nil
 }
 
-func (s *Service) serveMulticastResponses() {
-    port, _ := strconv.Atoi(s.port)
-    addr, err := net.ResolveUDPAddr("udp", ":" + strconv.Itoa(port + len(s.connByMethod) + 1))
-    if (err != nil) {
-        panic(err)
-    }
-
+func (s *Service) serveMulticastResponses(addr *net.UDPAddr) {
     s.multicastRespListener = addr
 
     conn, err := net.ListenUDP("udp", addr)
     if err != nil {
         panic(err)
     }
+    file, _:= conn.File()
+    syscall.SetsockoptInt(int(file.Fd()), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
 
     zlog.Info().
         Str("addr", addr.String()).
@@ -234,7 +241,7 @@ func (s *Service) establishConnections() error {
 			return fmt.Errorf("%s not set", envName)
 		}
 
-		addr, err := resolveAddr(port)
+		addr, err := resolveAddr(method, port)
 		if err != nil {
 			return err
 		}
@@ -253,9 +260,9 @@ func makeEnvMethodVariable(method string) string {
 	return strings.ToUpper(method) + "_PORT"
 }
 
-func resolveAddr(port string) (*net.UDPAddr, error) {
+func resolveAddr(method, port string) (*net.UDPAddr, error) {
 	if _, err := strconv.Atoi(port); err != nil {
 		return nil, fmt.Errorf("incorrect port: %s", port)
 	}
-	return net.ResolveUDPAddr("udp", ":" + port)
+	return net.ResolveUDPAddr("udp", net.JoinHostPort(method, port))
 }
