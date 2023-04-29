@@ -18,6 +18,8 @@ type Service struct {
     port string
     multicastAddr *net.UDPAddr
     estimator estimator.Estimator
+
+    mutex sync.Mutex
 }
 
 func New(port, method string) *Service {
@@ -113,7 +115,9 @@ func (s *Service) serve(conn *net.UDPConn) {
             Msg("Estimator accepted request")
             
         // Serailization method estimation
+        s.mutex.Lock()
         serializedSize, serializeDuration, deserializeDuration := estimator.Estimate(s.estimator)
+        s.mutex.Unlock()
 
         resp := protocol.NewEstimatorResponse(s.estimator.Method(), serializedSize, serializeDuration, deserializeDuration)
         respBytes, err := json.Marshal(resp)
