@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+message Object {
+    int64 i = 1;
+    float f = 2;
+    string s = 3;
+    repeated string a = 4;
+    map<string, string> m = 5;
+}

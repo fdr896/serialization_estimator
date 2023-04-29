@@ -1,4 +1,9 @@
+# IDE
+.vscode/
+
 # Binaries for programs and plugins
+bin/estimator/estimator
+bin/proxy/proxy
 *.exe
 *.exe~
 *.dll
